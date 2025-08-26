@@ -4,28 +4,35 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/FlowingSPDG/roland-go/v60hd"
+	"github.com/FlowingSPDG/roland-go/roland"
 )
 
 func main() {
-	// V-60HDのIPアドレスとポート番号
-	ipAddress := "192.168.2.254" // ご使用のV-60HDのIPアドレスに置き換えてください
+	// Device IP address and port (default TCP API port is 8023)
+	ipAddress := "192.168.2.254"
 	port := "8023"
 
-	// 切り替え先のチャンネル (例: SDI IN 1 は 0, SDI IN 2 は 1)
+	// Example: program selection
 	channel := 1
 
-	v, err := v60hd.NewV60HD(ipAddress, port)
+	c, err := roland.NewClient(ipAddress, port)
 	if err != nil {
-		fmt.Println("V-60HDの接続エラー:", err)
+		fmt.Println("Connection error:", err)
 		os.Exit(1)
 	}
-	defer v.Close()
+	defer c.Close()
 
-	if err := v.PGM(channel); err != nil {
-		fmt.Println("PGMコマンドの送信エラー:", err)
+	// Legacy helper using numeric channel
+	if err := c.PGM(channel); err != nil {
+		fmt.Println("PGM command error:", err)
 		os.Exit(1)
 	}
 
-	fmt.Println("処理を完了しました")
+	// Modern helper using label (uncomment for usage)
+	// if err := c.SetProgram("INPUT1"); err != nil {
+	// 	fmt.Println("SetProgram error:", err)
+	// 	os.Exit(1)
+	// }
+
+	fmt.Println("Done")
 }
