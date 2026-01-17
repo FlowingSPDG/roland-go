@@ -1,6 +1,8 @@
 # Roland Go Control Library
 
-A comprehensive Go library for controlling Roland video switchers and AV mixers via LAN/RS-232 interface.
+A comprehensive Go library for controlling Roland video switchers and AV mixers via Telnet (LAN) interface.
+
+The library communicates with Roland devices using Telnet over TCP, sending commands in ASCII format without the stx (02H) prefix as specified in the Roland control documentation.
 
 ## Supported Devices
 

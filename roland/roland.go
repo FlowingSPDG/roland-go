@@ -182,12 +182,14 @@ type Client struct {
 }
 
 // NewClient connects to a Roland switcher-compatible device (e.g., V-160HD, V-80HD, VR-120HD, VR-6HD)
-// via TCP port (typically 8023).
+// via Telnet over TCP (typically port 8023).
+// Commands are sent in ASCII format without stx (02H) prefix as per Telnet specification.
 func NewClient(ipAddress string, port string) (*Client, error) {
 	return NewClientWithDeviceType(ipAddress, port, DeviceV160HD)
 }
 
 // NewClientWithDeviceType connects to a Roland switcher-compatible device with specific device type
+// via Telnet over TCP. The connection uses ASCII command format without stx (02H) prefix.
 func NewClientWithDeviceType(ipAddress string, port string, deviceType DeviceType) (*Client, error) {
 	if ipAddress == "" {
 		return nil, errors.New("ipAddress must not be empty")
@@ -201,10 +203,11 @@ func NewClientWithDeviceType(ipAddress string, port string, deviceType DeviceTyp
 		return nil, fmt.Errorf("unsupported device type: %s", deviceType)
 	}
 
+	// Connect via Telnet (TCP connection)
 	address := net.JoinHostPort(ipAddress, port)
 	conn, err := net.Dial("tcp", address)
 	if err != nil {
-		return nil, xerrors.Errorf("dial tcp %s: %w", address, err)
+		return nil, xerrors.Errorf("dial telnet tcp %s: %w", address, err)
 	}
 
 	return &Client{
@@ -227,7 +230,8 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// send writes a command and waits for response, ensuring thread safety
+// send writes a Telnet command (ASCII format without stx prefix) and waits for response, ensuring thread safety.
+// Command format: "COMMAND:param1,param2;" (stx 02H is omitted for Telnet as per specification)
 func (c *Client) send(command string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -235,23 +239,25 @@ func (c *Client) send(command string) error {
 	if len(command) == 0 || command[len(command)-1] != ';' {
 		command = command + ";"
 	}
+	// Send command via Telnet (ASCII format, stx 02H is omitted)
 	if _, err := c.conn.Write([]byte(command)); err != nil {
-		return xerrors.Errorf("write command %q: %w", command, err)
+		return xerrors.Errorf("write telnet command %q: %w", command, err)
 	}
 
-	// Wait for response after sending command
+	// Wait for response after sending command (read until LF)
 	reader := bufio.NewReader(c.conn)
 	_, err := reader.ReadString('\n')
 	if err != nil {
-		return xerrors.Errorf("read response for command %q: %w", command, err)
+		return xerrors.Errorf("read telnet response for command %q: %w", command, err)
 	}
 	return nil
 }
 
-// SendRaw sends a prepared command body (e.g., "PGM:INPUT1;") and waits for response
+// SendRaw sends a prepared Telnet command body (e.g., "PGM:INPUT1;") and waits for response.
+// The command should be in ASCII format without stx (02H) prefix.
 func (c *Client) SendRaw(raw string) error { return c.send(raw) }
 
-// ReadResponse reads until LF following the final ';' (for manual response reading)
+// ReadResponse reads Telnet response until LF following the final ';' (for manual response reading)
 func (c *Client) ReadResponse() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -259,7 +265,7 @@ func (c *Client) ReadResponse() (string, error) {
 	reader := bufio.NewReader(c.conn)
 	line, err := reader.ReadString('\n')
 	if err != nil {
-		return "", xerrors.Errorf("read response: %w", err)
+		return "", xerrors.Errorf("read telnet response: %w", err)
 	}
 	return line, nil
 }
